@@ -1,0 +1,797 @@
+---
+title: "MSDS 6306: Doing Data Science - Case Study 02 - Attrition"
+author: "Venkata 'MG' Vanga"
+date: "11/20/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#R libraries
+```{r libraries,results='hide',warning=FALSE}
+library(knitr, warn.conflicts=F, quietly=T)
+library(yaml, warn.conflicts=F, quietly=T)
+library(dplyr, warn.conflicts=F, quietly=T)
+library(ggplot2, warn.conflicts=F, quietly=T)
+library(tidyr, warn.conflicts=F, quietly=T)
+require(graphics, warn.conflicts=F, quietly=T)
+library(tidyverse, warn.conflicts=F, quietly=T)
+library(magrittr, warn.conflicts=F, quietly=T)
+library(GGally, warn.conflicts=F, quietly=T)
+library(ggthemes, warn.conflicts=F, quietly=T)
+library(plotly, warn.conflicts=F, quietly=T)
+library(maps, warn.conflicts=F, quietly=T)
+library(stringr, warn.conflicts=F, quietly=T)
+library(stringi, warn.conflicts=F, quietly=T)
+library(mapproj, warn.conflicts=F, quietly=T)
+library(RCurl, warn.conflicts=F, quietly=T)
+library(readr, warn.conflicts=F, quietly=T)
+library(rio, warn.conflicts=F, quietly=T)
+library(naniar, warn.conflicts=F, quietly=T)
+library(scales, warn.conflicts=F, quietly=T)
+library(grid, warn.conflicts=F, quietly=T)
+library(mice, warn.conflicts=F, quietly=T)
+library(class, warn.conflicts=F, quietly=T)
+library(caret, warn.conflicts=F, quietly=T)
+library(e1071, warn.conflicts=F, quietly=T)
+library(datasets, warn.conflicts=F, quietly=T)
+#install.packages("investr")
+library(investr, warn.conflicts=F, quietly=T)
+library(fpp, warn.conflicts=F, quietly=T)
+library(fpp2, warn.conflicts=F, quietly=T)
+library(shiny, warn.conflicts=F, quietly=T)
+```
+
+
+#Employee data input from CSV files
+```{r Employee data}
+# This reads in the Employee data from select folder file CaseStudy2-data.csv.
+Fulldata <- read.csv("https://raw.githubusercontent.com/VenkataVanga/MSDS-6306-CaseStudy02-Attrition/main/CaseStudy2-data.csv",
+                     header = T,sep = ",",na.strings = "NA",fill = TRUE)
+head(Fulldata)
+```
+
+
+All the variables of given data are shown above.
+
+
+```{r Visualization, fig.width=15, fig.height=8}
+# Read pagination function from github
+source("https://raw.githubusercontent.com/VenkataVanga/MSDS6371-Project-Final/main/Facetwrap_Pagination.R")
+
+#While loop below will plot for all the data in 5 Pages.
+#Variables are sorted in alphabetical order.
+i <- 1
+while (i<5) {
+  pData <- ggplot(gather(Fulldata, cols, value), aes(x = value)) + 
+       geom_histogram(stat = 'count') +
+    ggtitle(paste("Attrition data Visualization",i)) + 
+    facet_wrap_paginate(.~cols, ncol = 3, nrow = 3, page = i)
+  i = i+1
+  print(pData) 
+}
+```
+
+
+
+
+
+
+#Analysis of factors effecting Attrition.
+
+Below are different factors that are considered to have significant effect on attrition.
+
+#Factor#1 -- Gender
+```{r Attribute - Gender, warning=FALSE}
+# Attrition data from full data
+Dat_Attrition <- Fulldata %>% filter(Attrition == "Yes")
+
+# Non-Attrition data from full data
+Dat_NonAttrition <- Fulldata %>% filter(Attrition == "No")
+
+#summary of Gender - Full data
+S_GenderFulldata <- Fulldata %>% group_by(Gender)%>% summarize(count = n()) %>%
+ mutate(pct = count/sum(count))
+
+#summary of Gender - Non Attrition
+S_GenderNonAttrition <- Dat_NonAttrition %>% group_by(Gender)%>% 
+  summarize(count = n()) %>% mutate(pct = count/sum(count))
+
+#summary of Gender - Attrition
+S_GenderAttrition <- Dat_Attrition %>% group_by(Gender)%>% 
+  summarize(count = n()) %>% mutate(pct = count/sum(count))
+
+#Full data gender plot with numbers and percentage
+Full_Gen <- ggplot(Fulldata, aes(x = Gender,fill = Gender)) + 
+  geom_bar(show.legend = FALSE) + 
+  ggtitle("Full Data Female / Male count") +
+  geom_text(aes(Gender, count+10, label = count), 
+            data = S_GenderFulldata) + 
+  geom_text(aes(Gender, count/2, 
+                label = percent(pct)), 
+            data = S_GenderFulldata) + geom_text(aes(Gender[1], max(count)+50, 
+                label = paste("Total Full Data Count = ",sum(count))),nudge_x = 0.5, 
+            data = S_GenderFulldata) +
+  theme(plot.background = element_rect(colour = "black",size = 1))
+
+#Non-attrition data gender plot with numbers and percentage
+NonAttrition_Gen <- ggplot(Dat_NonAttrition, aes(x = Gender,fill = Gender)) + 
+  geom_bar(show.legend = FALSE) + 
+  ggtitle("Non-Attrition Data Female / Male count") +
+  geom_text(aes(Gender, count+10, label = count), 
+            data = S_GenderNonAttrition) + 
+  geom_text(aes(Gender, count/2, 
+                label = percent(pct)), 
+            data = S_GenderNonAttrition) + geom_text(aes(Gender[1], max(count)+50, 
+                label = paste("Total Non-Attrition Data Count = ",sum(count))),
+                nudge_x = 0.5, data = S_GenderNonAttrition) + 
+  theme(plot.background = element_rect(colour = "black",size = 1))
+
+#Attrition data gender plot with numbers and percentage
+Attrition_Gen <- ggplot(Dat_Attrition, aes(x = Gender,fill = Gender)) + 
+  geom_bar(show.legend = FALSE) + 
+  ggtitle("Attrition Data Female / Male count") +
+  geom_text(aes(Gender, count+3, label = count), 
+            data = S_GenderAttrition) + 
+  geom_text(aes(Gender, count/2, 
+                label = percent(pct)), 
+            data = S_GenderAttrition)+ geom_text(aes(Gender[1], max(count)+20, 
+                label = paste("Total Attrition Data Count = ",sum(count))),
+                nudge_x = 0.5, data = S_GenderAttrition) +
+  theme(plot.background = element_rect(colour = "black",size = 1))
+```
+#Attribute - Gender significance with Attrition
+```{r,fig.width=15, fig.height=8}
+#Grid.draw is used to plot all gender plots at once
+grid.draw(cbind(ggplotGrob(Full_Gen),
+                ggplotGrob(NonAttrition_Gen),ggplotGrob(Attrition_Gen)))
+
+```
+
+
+From the above plots it is clearly evident that the percentage of males [62%] in attrition has increased than the full data [59%] and non-attrition data[59%.
+There no difference in gender percentages between full data and non-attrition data.
+This indicates that there is more chance of attrition of male employees as compared to female employees.
+
+
+
+#Factor#2 -- Age
+```{r Attribute - Age}
+StatsAge <- Dat_Attrition %>% summarize(Mean = mean(Age),Median = median(Age), 
+                                     Max = max(Age), Min = min(Age),
+                        SD = sd(Age), N = n())
+#Histogram and Density Plot
+His_Den <- Dat_Attrition %>% ggplot(aes(x=Age)) +
+  geom_histogram(aes(y=..density..),colour='black',fill='white', binwidth = 1) +
+  geom_density(alpha=.4, fill='#FFFF00') + 
+  ggtitle('Attrition Age - Histogram, Density and Box Plots') + labs(y="Density / Count") + scale_x_continuous(breaks = c(20,25,30,35,40,45,50,55,60))
+
+His_DenAge <- His_Den +  scale_y_continuous("Density", 
+                                    sec.axis = sec_axis(~ . *sum(ggplot_build(His_Den)$data[[1]]$count), name = "Count"))
+
+#Box plot for Age
+Box <- Dat_Attrition %>% ggplot(aes(x=Age)) + 
+  geom_boxplot(col='black',fill='#FFFF00') + scale_x_continuous(breaks = c(20,25,30,35,40,45,50,55,60))
+
+#Male Age - attrition
+
+StatsMaleAge <- Dat_Attrition %>% filter(Gender == "Male") %>%
+  summarize(Mean = mean(Age),Median = median(Age),Max = max(Age), 
+          Min = min(Age),SD = sd(Age), N = n())
+#Histogram and Density Plot Male
+His_DenMale <- Dat_Attrition %>% filter(Gender == "Male") %>% ggplot(aes(x=Age)) +
+  geom_histogram(aes(y=..density..),colour='red',fill='blue', binwidth = 1) +
+  geom_density(alpha=.4, fill='#FFFF00') + 
+  ggtitle('Attrition Age (Male) - Histogram, Density and Box Plots') + labs(y="Density / Count") + scale_x_continuous(breaks = c(20,25,30,35,40,45,50,55,60))
+
+His_DenMale1 <- His_DenMale +  scale_y_continuous("Density", 
+                                    sec.axis = sec_axis(~ . *sum(ggplot_build(His_DenMale)$data[[1]]$count), name = "Count"))
+
+#Box plot for Age Male
+BoxMale <- Dat_Attrition %>% filter(Gender == "Male") %>% ggplot(aes(x=Age)) + 
+  geom_boxplot(col='black',fill='#FF6666') + scale_x_continuous(breaks = c(20,25,30,35,40,45,50,55,60))
+
+
+#Female Age - attrition
+
+StatsFemaleAge <- Dat_Attrition %>% filter(Gender == "Female") %>% 
+  summarize(Mean = mean(Age),Median = median(Age),Max = max(Age), 
+          Min = min(Age),SD = sd(Age), N = n())
+
+#Histogram and Density Plot Female
+His_DenFemale <- Dat_Attrition %>% filter(Gender == "Female") %>% ggplot(aes(x=Age)) +
+  geom_histogram(aes(y=..density..),colour='blue',fill='#FF6666', binwidth = 1) +
+  geom_density(alpha=.4, fill='#FFFF00') + 
+  ggtitle('Attrition Age (Female) - Histogram, Density and Box Plots') + 
+  scale_x_continuous(breaks = c(20,25,30,35,40,45,50,55,60))
+
+His_DenFemale1 <- His_DenFemale +  scale_y_continuous("Density", 
+                                    sec.axis = sec_axis(~ . *sum(ggplot_build(His_DenFemale)$data[[1]]$count), name = "Count"))
+
+#Box plot for Age Female
+BoxFemale <- Dat_Attrition %>% filter(Gender == "Female") %>% ggplot(aes(x=Age)) + 
+  geom_boxplot(col='black',fill='blue') + scale_x_continuous(breaks = c(20,25,30,35,40,45,50,55,60))
+```
+
+
+#Attribute - Age significance with Attrition
+```{r Age - Fulldata}
+#Full data Histogram density plot and Box plot on same scale
+grid.draw(rbind(ggplotGrob(His_DenAge),
+                ggplotGrob(Box),
+                size = "first"))
+
+StatsAge
+```
+
+```{r Age - Male}
+#Male data Histogram density plot and Box plot on same scale
+grid.draw(rbind(ggplotGrob(His_DenMale1),
+                ggplotGrob(BoxMale),
+                size = "first"))
+StatsMaleAge
+```
+
+```{r Age-Female}
+#Female data Histogram density plot and Box plot on same scale
+grid.draw(rbind(ggplotGrob(His_DenFemale1),
+                ggplotGrob(BoxFemale),
+                size = "first"))
+
+StatsFemaleAge
+```
+
+
+Considering age as one of the attribute for attrition, the age between 27 years to 34 years are the significant years for both Male and Female where major attrition takes place.
+
+
+#Factor#3 -- JobLevel
+```{r Attribute - JobLevel, warning='hide'}
+
+#summary of JobLevel - Full data
+S_JobFulldata <- Fulldata %>% group_by(JobLevel)%>% summarize(count = n()) %>%
+  mutate(pct = count/sum(count))
+
+#summary of JobLevel - Non Attrition
+S_JobNonAttrition <- Dat_NonAttrition %>% group_by(JobLevel)%>% 
+  summarize(count = n()) %>% mutate(pct = count/sum(count))
+
+#summary of JobLevel - Attrition
+S_JobAttrition <- Dat_Attrition %>% group_by(JobLevel)%>% 
+  summarize(count = n()) %>% mutate(pct = count/sum(count))
+
+
+FullJob <- ggplot(Fulldata, aes(x = JobLevel, group = JobLevel)) + 
+  geom_bar(aes(fill=as.factor(JobLevel)),show.legend = FALSE) + 
+  ggtitle("Full Data JobLevel") +
+  geom_text(aes(JobLevel, count+10, label = count), 
+            data = S_JobFulldata) + 
+  geom_text(aes(JobLevel, count/2, 
+                label = percent(pct)), 
+            data = S_JobFulldata) + geom_text(aes(JobLevel[3], max(count)+50, 
+                label = paste("Total Job Level (Full Data) Count = ",sum(count))),
+                data = S_JobFulldata) +
+  theme(plot.background = element_rect(colour = "black",size = 1))
+
+NonAttritionJob <- ggplot(Dat_NonAttrition, aes(x = JobLevel, group = JobLevel)) + 
+  geom_bar(aes(fill=as.factor(JobLevel)),show.legend = FALSE) + 
+  ggtitle("Non-Attrition Data JobLevel") +
+  geom_text(aes(JobLevel, count+10, label = count), 
+            data = S_JobNonAttrition) + 
+  geom_text(aes(JobLevel, count/2, 
+                label = percent(pct)), 
+            data = S_JobNonAttrition) + geom_text(aes(JobLevel[3], max(count)+20, 
+                label = paste("Total Job Level (Non-Attrition Data) Count = ",
+                              sum(count))), data = S_JobFulldata) +
+  theme(plot.background = element_rect(colour = "black",size = 1))
+
+AttritionJob <- ggplot(Dat_Attrition, aes(x = JobLevel, group = JobLevel)) + 
+  geom_bar(aes(fill=as.factor(JobLevel)),show.legend = FALSE) + 
+  ggtitle("Attrition Data JobLevel") +
+  geom_text(aes(JobLevel, count+2, label = count), 
+            data = S_JobAttrition) + 
+  geom_text(aes(JobLevel, count/2, 
+                label = percent(pct)), 
+            data = S_JobAttrition) + geom_text(aes(JobLevel[3], max(count)+20, 
+                label = paste("Total Job Level (Attrition Data) Count = ",
+                              sum(count))), data = S_JobAttrition) +
+  theme(plot.background = element_rect(colour = "black",size = 1))
+
+```
+
+#Attribute - JobLevel significance with Attrition
+```{r,fig.width=15, fig.height=8}
+grid.draw(cbind(ggplotGrob(FullJob),
+                ggplotGrob(NonAttritionJob),ggplotGrob(AttritionJob)))
+
+```
+
+
+From above plots it can be visualized that there are more employees working joblevel 1 and joblevel 2 in the given data. 
+Full data [37.8% + 35.9%=73.7%] and 
+non-attrition data [33.3% + 38.6%=71.9%] have approximately same joblevel 1 and joblevel 2 combined percentages. 
+But, the attrition data shows significantly higher attrition percentage for 
+joblevel 1 [61.43%] and 
+a combined joblevel 1 & 2 attrition percentage of 82.86% (61.43% + 21.43%).
+This indicates a approximate 9% - 10% combined joblevel 1 & 2 attrition percentage increase, which signifies major attrition is occurring in joblevel 1 followed by joblevel 2.
+
+
+
+#Factor#4 -- JobInvolvement
+```{r Attribute - JobInvolvement, warning='hide'}
+
+#summary of JobInvolvement - Full data
+S_InvolveFulldata <- Fulldata %>% group_by(JobInvolvement)%>% 
+  summarize(count = n()) %>%
+  mutate(pct = count/sum(count))
+
+#summary of JobInvolvement - Non Attrition
+S_InvolveNonAttrition <- Dat_NonAttrition %>% group_by(JobInvolvement)%>% 
+  summarize(count = n()) %>% mutate(pct = count/sum(count))
+
+#summary of JobInvolvement - Attrition
+S_InvolveAttrition <- Dat_Attrition %>% group_by(JobInvolvement)%>% 
+  summarize(count = n()) %>% mutate(pct = count/sum(count))
+
+
+Full_Involve <- ggplot(Fulldata, aes(x = JobInvolvement, group = JobInvolvement)) + 
+  geom_bar(aes(fill=as.factor(JobInvolvement)),show.legend = FALSE) + 
+  ggtitle("Full Data JobInvolvement") +
+  geom_text(aes(JobInvolvement, count+10, label = count), 
+            data = S_InvolveFulldata) + 
+  geom_text(aes(JobInvolvement, count/2, 
+                label = percent(pct)), 
+            data = S_InvolveFulldata) + 
+  geom_text(aes(JobInvolvement[2], max(count)+50,
+                label = paste("Total Job Involvement (Full Data) Count = ",
+                              sum(count))),
+                nudge_x = 0.5, data = S_InvolveFulldata) +
+  theme(plot.background = element_rect(colour = "black",size = 1))
+
+NonAttrition_Involve <- ggplot(Dat_NonAttrition, aes(x = JobInvolvement, 
+                                                group = JobInvolvement)) + 
+  geom_bar(aes(fill=as.factor(JobInvolvement)),show.legend = FALSE) + 
+  ggtitle("Non-Attrition Data JobInvolvement") +
+  geom_text(aes(JobInvolvement, count+10, label = count), 
+            data = S_InvolveNonAttrition) + 
+  geom_text(aes(JobInvolvement, count/2, 
+                label = percent(pct)), 
+            data = S_InvolveNonAttrition) + 
+  geom_text(aes(JobInvolvement[2], max(count)+50,
+                label = paste("Total Job Involvement (Non-Attrition Data) Count = ",
+                              sum(count))),
+                nudge_x = 0.5, data = S_InvolveNonAttrition) +
+  theme(plot.background = element_rect(colour = "black",size = 1))
+
+Attrition_Involve <- ggplot(Dat_Attrition, 
+                       aes(x = JobInvolvement, group = JobInvolvement)) + 
+  geom_bar(aes(fill=as.factor(JobInvolvement)),show.legend = FALSE) + 
+  ggtitle("Attrition Data JobInvolvement") +
+  geom_text(aes(JobInvolvement, count+2, label = count), 
+            data = S_InvolveAttrition) + 
+  geom_text(aes(JobInvolvement, count/2, 
+                label = percent(pct)), 
+            data = S_InvolveAttrition) + 
+  geom_text(aes(JobInvolvement[2], max(count)+20,
+                label = paste("Total Job Involvement (Attrition Data) Count = ",
+                              sum(count))),
+                nudge_x = 0.5, data = S_InvolveAttrition) +
+  theme(plot.background = element_rect(colour = "black",size = 1))
+
+```
+
+#Attribute - JobInvolvement significance with Attrition
+```{r,fig.width=15, fig.height=8}
+grid.draw(cbind(ggplotGrob(Full_Involve),
+                ggplotGrob(NonAttrition_Involve),ggplotGrob(Attrition_Involve)))
+
+```
+
+
+From above plots it can be observed that there are more employees with job involvement 3 [59.1%] in the given data. Below are few details discussing the significance in numbers: 
+Full data - job involvement 1 and 2 category has [5.4% + 26.2% = 31.6%].
+NonAttrition data - job involvement 1 and 2 category has [3.4% + 25.2% = 28.6%].
+Attrition data - job involvement 1 and 2 category has [16% + 31% = 47%].
+This indicates there is approximately 15.4% - 18.4% increase in attrition for job involvement 1 and 2 categories. This signifies major attrition in job involvement category 1 category followed by job involvement category 2.
+
+
+# Monthly Income is the significant attribute for he employers so adding monthly income to the list of factors to visualize for attrition.
+```{r Monthly Income, fig.width=10, fig.height=8}
+p <- ggplot(Fulldata, aes(x=TotalWorkingYears, y=MonthlyIncome)) + 
+  geom_point(aes(shape = Attrition, color = Attrition), size=2.5) + 
+    ggtitle('MonthlyIncome v. Total Working years - Full Data') + 
+    theme(# AXIS LABLES APPEARANCE
+  plot.title = element_text(size=14, face= "bold", colour= "black" ),
+  axis.title.x = element_text(size=12, face="bold", colour = "black"),    
+  axis.title.y = element_text(size=12, face="bold", colour = "black"),    
+  axis.text.x = element_text(size=12, face="bold", colour = "black"), 
+  axis.text.y = element_text(size=12, face="bold", colour = "black"),
+  strip.text.x = element_text(size = 10, face="bold", colour = "black" ),
+  strip.text.y = element_text(size = 10, face="bold", colour = "black"),) + 
+  scale_x_continuous(name = "Experience - Total Working years") + 
+  scale_y_continuous(name = "Monthly Income ($)") + 
+  geom_smooth(method = "lm", color="black", size = 1.25)
+
+#from https://stackoverflow.com/questions/7549694/add-regression-line-equation-and-r2-on-graph
+lm_eqn <- function(Fulldata){
+  m <- lm(MonthlyIncome~TotalWorkingYears,data = Fulldata);
+  eq <- substitute(italic("MonthlyIncome") == a %*% + b %*% italic("TotalWorkingYears")*","~~italic(R)^2~"="~r2, 
+                   list(a = format(unname(coef(m)[1]), digits = 5),
+                        b = format(unname(coef(m)[2]), digits = 5),
+                        r2 = format(summary(m)$r.squared, digits = 3)))
+  as.character(as.expression(eq));
+}
+
+#Plot added with regression equation
+p1 <- p + geom_text(x = 10, y = 20000, label = lm_eqn(Fulldata), parse = TRUE)
+
+p1
+```
+
+The above plot shows Full data Monthly Income vs. Total working year.
+
+#Montly Income non attrition
+```{r Monthly Income Non Attrition, fig.width=10, fig.height=8}
+pNon <- ggplot(Dat_NonAttrition, aes(x=TotalWorkingYears, y=MonthlyIncome)) + 
+  geom_point(aes(shape = Attrition, color = Attrition), size=2.5) + 
+    ggtitle('MonthlyIncome v. Total Working years - Non Attrition') + 
+    theme(# AXIS LABLES APPEARANCE
+  plot.title = element_text(size=14, face= "bold", colour= "black" ),
+  axis.title.x = element_text(size=12, face="bold", colour = "black"),    
+  axis.title.y = element_text(size=12, face="bold", colour = "black"),    
+  axis.text.x = element_text(size=12, face="bold", colour = "black"), 
+  axis.text.y = element_text(size=12, face="bold", colour = "black"),
+  strip.text.x = element_text(size = 10, face="bold", colour = "black" ),
+  strip.text.y = element_text(size = 10, face="bold", colour = "black"),) + 
+  scale_x_continuous(name = "Experience - Total Working years") + 
+  scale_y_continuous(name = "Monthly Income ($)") + 
+  geom_smooth(method = "lm", color="black", size = 1.25)
+
+#from https://stackoverflow.com/questions/7549694/add-regression-line-equation-and-r2-on-graph
+lm_eqn <- function(Dat_NonAttrition){
+  m <- lm(MonthlyIncome~TotalWorkingYears,data = Dat_NonAttrition);
+  eq <- substitute(italic("MonthlyIncome") == a %*% + b %*% italic("TotalWorkingYears")*","~~italic(R)^2~"="~r2, 
+                   list(a = format(unname(coef(m)[1]), digits = 5),
+                        b = format(unname(coef(m)[2]), digits = 5),
+                        r2 = format(summary(m)$r.squared, digits = 3)))
+  as.character(as.expression(eq));
+}
+
+#Plot added with regression equation
+p1Non <- pNon + geom_text(x = 10, y = 20000, label = lm_eqn(Dat_NonAttrition), 
+                    parse = TRUE)
+
+p1Non
+```
+
+
+The above plot shows Non-Attrition data Monthly Income vs. Total working year.
+
+
+#Montly Income attrition
+```{r Monthly Income Attrition, fig.width=10, fig.height=8}
+pAttr <- ggplot(Dat_Attrition, aes(x=TotalWorkingYears, y=MonthlyIncome)) + 
+  geom_point(shape = 24, fill = "#30D5C8", aes(color = "Attrition"), size=2.5) + 
+    ggtitle('MonthlyIncome v. Total Working years - Attrition') + 
+  guides(color=guide_legend(title="Attrition")) + 
+    theme(# AXIS LABLES APPEARANCE
+  plot.title = element_text(size=14, face= "bold", colour= "black" ),
+  axis.title.x = element_text(size=12, face="bold", colour = "black"),    
+  axis.title.y = element_text(size=12, face="bold", colour = "black"),    
+  axis.text.x = element_text(size=12, face="bold", colour = "black"), 
+  axis.text.y = element_text(size=12, face="bold", colour = "black"),
+  strip.text.x = element_text(size = 10, face="bold", colour = "black" ),
+  strip.text.y = element_text(size = 10, face="bold", colour = "black"),) + 
+  scale_x_continuous(name = "Experience - Total Working years") + 
+  scale_y_continuous(name = "Monthly Income ($)") + 
+  geom_smooth(method = "lm", color="black", size = 1.25)
+
+#from https://stackoverflow.com/questions/7549694/add-regression-line-equation-and-r2-on-graph
+lm_eqn <- function(Dat_Attrition){
+  m <- lm(MonthlyIncome~TotalWorkingYears,data = Dat_Attrition);
+  eq <- substitute(italic("MonthlyIncome") == a %*% + b %*% italic("TotalWorkingYears")*","~~italic(R)^2~"="~r2, 
+                   list(a = format(unname(coef(m)[1]), digits = 5),
+                        b = format(unname(coef(m)[2]), digits = 5),
+                        r2 = format(summary(m)$r.squared, digits = 3)))
+  as.character(as.expression(eq));
+}
+
+#Plot added with regression equation
+p1Attr <- pAttr + geom_text(x = 10, y = 15000, label = lm_eqn(Dat_Attrition), 
+                    parse = TRUE)
+
+p1Attr
+```
+
+
+The above plot shows Attrition data Monthly Income vs. Total working year.
+Based on the equations shown on above plots it is observed that the slope for the attrition data is low as compared to the non-attrition data which suggest that the increase in Monthly Income is lower than the increase in Monthly Income for non-attrition group - per every unit increase in total working years. 
+
+
+#kNN approach to test the data sensitivity and specificity based on QOI
+```{r kNN, fig.width=10, fig.height=8}
+# kNN approach for 500 dataset iterations and 1-30 k values
+iterations = 500 # number of iterations to test the k value
+numks = 30      # number of k used in the iterations
+
+# split percentage assumed from the full data set based on attrition/Fulldata
+splitPerc = nrow(Dat_Attrition)/nrow(Dat_NonAttrition) #approx 19%
+
+
+
+#Since the data is unbalanced (more non attrition than attrition), tried to create more balanced data using different split percentage of indices for non-attrition and attrition data.
+#https://rpubs.com/amarnathbose/knn-R - conclusion used for determining training and test sets values.
+trainIndices = sample(1:dim(Dat_NonAttrition)[1],
+                     round(0.65*splitPerc * dim(Dat_NonAttrition)[1]))
+trainIndices1 = sample(1:dim(Dat_Attrition)[1],
+                     round(0.65 * dim(Dat_Attrition)[1]))
+Attrition_train = rbind(Dat_NonAttrition[trainIndices,],
+                        Dat_Attrition[trainIndices1,])
+Attrition_test = rbind(Dat_NonAttrition[-trainIndices,],
+                        Dat_Attrition[-trainIndices1,])
+# write.csv(Attrition_train,file = "Attrition_train.csv")
+# write.csv(Attrition_test,file = "Attrition_test.csv")
+#Replacing Gender with Male as 0 Female as 1
+Attrition_train$Gender <- ifelse(Attrition_train$Gender == "Male",0,1)
+Attrition_test$Gender <- ifelse(Attrition_test$Gender  == "Male",0,1)
+
+set.seed(5)
+#columns that are considered significant for Attrition as discussed above are selected for kNN. An additional column of Monthly Income is added to the kNN attributes as this would be the attribute of interest for any client looking for attrition. 
+classifications = knn(Attrition_train[,c("JobLevel","JobInvolvement","Age",
+                                         "Gender","MonthlyIncome")],
+Attrition_test[,c("JobLevel","JobInvolvement","Age","Gender","MonthlyIncome")],
+                      Attrition_train$Attrition, prob = TRUE, k = 13)
+CM = confusionMatrix(table(classifications,Attrition_test$Attrition))
+#classifications
+#CM
+#Above Confusion Matrix and Statistics show a accuracy of ~60%
+
+
+
+#Doing iterations to check best k value
+masterAcc = matrix(nrow = iterations, ncol = numks)
+masterSensi = matrix(nrow = iterations, ncol = numks)
+masterSpeci = matrix(nrow = iterations, ncol = numks)
+for(j in 1:iterations)
+{
+  set.seed(5)
+  accs = data.frame(accuracy = numeric(30), k = numeric(30))
+  sensi = data.frame(sensitivity  = numeric(30), k = numeric(30))
+  speci = data.frame(specificity  = numeric(30), k = numeric(30))
+  for(i in 1:numks)
+  {
+classifications = knn(Attrition_train[,c("JobLevel","JobInvolvement","Age",
+                                         "Gender","MonthlyIncome")], Attrition_test[,c("JobLevel","JobInvolvement","Age","Gender","MonthlyIncome")],
+                      Attrition_train$Attrition, prob = TRUE, k = i)
+    table(classifications,Attrition_test$Attrition)
+    CM = confusionMatrix(table(classifications,Attrition_test$Attrition))
+    masterAcc[j,i] = CM$overall[1]
+    masterSensi[j,i] = CM$byClass[1]
+    masterSpeci[j,i] = CM$byClass[2]
+  }
+}
+kNN_MeanAcc = colMeans(masterAcc)
+kNN_MeanSensi = colMeans(masterSensi)
+kNN_MeanSpeci = colMeans(masterSpeci)
+dfmeans <- data.frame(x = seq(1,numks,1),kNN_MeanAcc,kNN_MeanSensi,kNN_MeanSpeci)
+p = ggplot(mapping = aes(x = seq(1,numks,1), y = kNN_MeanAcc,color="MeanAcc")) + geom_line() + ggtitle("Mean Accuracy, Mean Sensitivity & Mean Specificity  v. Number of k") +
+  xlab('k values') + ylab(paste("Mean Accuracy, Mean Sensitivity\n Mean Specificity")) + geom_line(aes(y = kNN_MeanSensi,color="MeanSensi")) + geom_line(aes(y = kNN_MeanSpeci,color="MeanSpeci"))
+#p
+
+ggplotly(p)
+```
+
+
+The above plot shows the iterative analysis for k values vs. mean accuracy, mean sensitivity and mean specificity using kNN approach.
+
+
+#Naive Bayes approach to test the data sensitivity and specificity based on QOI 
+```{r Naive Bayes}
+# Selecting the splitperc and train indices and appoach for naive bayes is same as the kNN approach discussed above.
+iterations = 500
+nbmasterAcc = matrix(nrow = iterations)
+nbmasterSensi = matrix(nrow = iterations)
+nbmasterSpeci = matrix(nrow = iterations)
+# split percentage assumed from the full data set based on attrition/Fulldata
+splitPerc = nrow(Dat_Attrition)/nrow(Dat_NonAttrition) #approx 19%
+nbtrainIndices = sample(1:dim(Dat_NonAttrition)[1],
+                        round(0.8*splitPerc * dim(Dat_NonAttrition)[1]))
+nbtrainIndices1 = sample(1:dim(Dat_Attrition)[1],
+                     round(0.6 * dim(Dat_Attrition)[1]))
+Attrition_trainnb = rbind(Dat_NonAttrition[nbtrainIndices,],
+                        Dat_Attrition[nbtrainIndices1,])
+Attrition_testnb = rbind(Dat_NonAttrition[-nbtrainIndices,],
+                        Dat_Attrition[-nbtrainIndices1,])
+# write.csv(Attrition_train,file = "Attrition_train.csv")
+# write.csv(Attrition_test,file = "Attrition_test.csv")
+#Replacing Gender with Male as 0 Female as 1
+Attrition_trainnb$Gender <- ifelse(Attrition_trainnb$Gender == "Male",0,1)
+Attrition_testnb$Gender <- ifelse(Attrition_testnb$Gender  == "Male",0,1)
+
+
+for(j in 1:iterations)
+{
+  set.seed(10)
+  #training
+  NB_Attrition = naiveBayes(Attrition_trainnb[ ,c("JobLevel","JobInvolvement",
+                                                 "Age",
+                                                 "Gender","MonthlyIncome")],
+                            as.factor(Attrition_trainnb$Attrition),laplace = 0)
+  #Prediction
+  table(predict(NB_Attrition,Attrition_testnb[,c("JobLevel","JobInvolvement",
+                                            "Age","Gender",
+                                            "MonthlyIncome")]),
+        as.factor(Attrition_testnb$Attrition))
+  CMNB = confusionMatrix(table(predict(NB_Attrition,
+                                Attrition_testnb[,c("JobLevel","JobInvolvement",
+                                                         "Age","Gender",
+                                                         "MonthlyIncome")]),
+                             as.factor(Attrition_testnb$Attrition)))
+  nbmasterAcc[j] = CMNB$overall[1]
+  nbmasterSensi[j] = CMNB$byClass[1]
+  nbmasterSpeci[j] = CMNB$byClass[2]
+}
+NB_MeanAcc = colMeans(nbmasterAcc)
+NB_MeanSensi = colMeans(nbmasterSensi)
+NB_MeanSpeci = colMeans(nbmasterSpeci)
+dfmeans_NB <- data.frame(NB_MeanAcc,NB_MeanSensi,NB_MeanSpeci)
+dfmeans_NB
+```
+
+
+
+Above output shows that a mean accuracy, mean specificity and mean sensitivity for Naive Bayes.
+
+
+#Regression QOI#2
+```{r regression, fig.width=10, fig.height=8}
+
+i <- 1
+while (i<6) {
+preg <- Fulldata %>% select(-ID, -BusinessTravel, -DistanceFromHome, 
+                            - EmployeeCount, -EmployeeNumber) %>%
+  gather(-MonthlyIncome, key = "var", value = "value") %>%
+  ggplot(aes(x = value, y = MonthlyIncome)) +
+  geom_point() + ggtitle(paste("Monthly Income v/s. attributes, Page",i)) + 
+  scale_y_continuous(name = "Montly Income ($)") +
+  theme_bw() + facet_wrap_paginate(~var, ncol = 3, nrow = 2, page = i) 
+  i = i+1
+  print(preg) 
+}
+```
+
+
+From above Page 1 to Page 5 plots shows all the plots of Monthly income vs. major attributes. Based on the plots 1. Age, 2. Daily rate, 3. Education Field, 4. Education, 5. Hourly Rate, 6. Job Level, 7. Job Role, 8. Monthly Rate, 9. Percent Salary Hike, 10. Total working Years, 11 years at company are selected for further regression analysis.
+
+
+#Intial regression
+```{r initial regression}
+
+Ireg <- lm(MonthlyIncome~TotalWorkingYears + YearsAtCompany + 
+             PercentSalaryHike + MonthlyRate + JobRole + JobLevel + 
+             HourlyRate + Education + EducationField + DailyRate +
+             Age, data = Fulldata)
+Ireg
+summary(Ireg)
+CV(Ireg)
+anova(Ireg)
+```
+
+
+From ANOVA output it can be seen that Total working years, Monthly Rate, Job Role, Job Level are the factors that are statistically significant (p<0.05).
+Using the above factors rerunning the regression analysis.
+
+
+
+#Rerun regression
+```{r rerun regression}
+Rreg <- lm(MonthlyIncome~TotalWorkingYears + MonthlyRate + JobRole + 
+             JobLevel, data = Fulldata)
+Rreg
+summary(Rreg)
+CV(Rreg)
+anova(Rreg)
+```
+
+The ANOVA output data for the rerun regression looks good. Continuing with the rerun regression model and visualizing the scatter plot.
+
+
+```{r rerun regression numeric-jobrole}
+#Regression Considering JobRole as a numeric variable.
+Rregdata <- Fulldata %>% mutate(JobRole = as.numeric(as.factor(JobRole)))
+Rreg1 <- lm(MonthlyIncome~TotalWorkingYears + MonthlyRate + JobRole + 
+             JobLevel, data = Rregdata)
+Rreg1
+summary(Rreg1)
+CV(Rreg1)
+anova(Rreg1)
+
+
+
+```
+
+#Rerun regression scatter plot
+
+```{r rerun regression plot}
+pRreg <- Fulldata %>% select(MonthlyIncome,TotalWorkingYears,MonthlyRate,
+                             JobRole,JobLevel) %>%
+  gather(-MonthlyIncome, key = "var", value = "value") %>%
+  ggplot(aes(x=value, y=MonthlyIncome)) +
+  geom_point() + 
+  ggtitle(paste("Monthly Income v/s. Statistically significant attributes")) + 
+  scale_y_continuous(name = "Montly Income ($)") +
+  theme_bw() + facet_wrap(.~var, scales = "free") 
+#pRreg
+#Above plot is only for verification to sort all variables for a good plot
+pRreg1 <- Fulldata %>% select(MonthlyIncome,TotalWorkingYears,MonthlyRate,
+                             JobRole,JobLevel) %>%
+  ggplot(aes(x=TotalWorkingYears, y=MonthlyIncome)) +
+  geom_point() + 
+  ggtitle(paste("Monthly Income v/s. Total Working Years")) + 
+  scale_y_continuous(name = "Montly Income ($)") + 
+  scale_x_continuous(name = "Total Working Years") + 
+  theme_bw() + geom_smooth(method = "lm")
+
+pRreg2 <- Fulldata %>% select(MonthlyIncome,TotalWorkingYears,MonthlyRate,
+                             JobRole,JobLevel) %>%
+  mutate(bin=cut_width(MonthlyRate, width=0.5, boundary=0)) %>%
+  ggplot(aes(x = bin, y = MonthlyIncome)) +
+  geom_boxplot() +
+  ggtitle(paste("Monthly Income v/s. Monthly Rate")) + 
+  scale_y_continuous(name = "Montly Income ($)") + 
+    scale_x_discrete(name = "Monthly Rate ($)")+
+    theme_bw()
+
+pRreg3 <- Fulldata %>% select(MonthlyIncome,TotalWorkingYears,MonthlyRate,
+                             JobRole,JobLevel) %>% 
+  mutate(JobRole = fct_reorder(JobRole, MonthlyIncome, .fun='median' )) %>% 
+  ggplot(aes(x = fct_reorder(JobRole, MonthlyIncome), y = MonthlyIncome)) +
+  geom_point() + 
+  ggtitle(paste("Monthly Income v/s. Job Role")) + 
+  scale_y_continuous(name = "Montly Income ($)") + 
+  scale_x_discrete(name = "Job Role") +
+  theme_bw() + 
+  theme(axis.text.x=element_text(angle=25,hjust=1,size=10))
+
+pRreg4 <- Fulldata %>% select(MonthlyIncome,TotalWorkingYears,MonthlyRate,
+                             JobRole,JobLevel) %>% 
+  mutate(JobLevel = reorder(JobLevel, MonthlyIncome, .fun='median' )) %>% 
+  ggplot(aes(x = reorder(JobLevel, MonthlyIncome), y = MonthlyIncome)) +
+  geom_point() + 
+  ggtitle(paste("Monthly Income v/s. Job Level")) + 
+  scale_y_continuous(name = "Montly Income ($)") + 
+  scale_x_discrete(name = "Job Level") +
+  theme_bw() + geom_smooth(method = "lm")
+```
+```{r Regplot,fig.width=10, fig.height=8}
+#Grid.draw is used to plot all gender plots at once
+grid.draw(cbind(ggplotGrob(pRreg1),
+                ggplotGrob(pRreg2)))
+```
+```{r Regplot1,fig.width=10, fig.height=8}
+grid.draw(cbind(ggplotGrob(pRreg3),
+                ggplotGrob(pRreg4)))
+```
+
+Above plots show the visualization for Monthly Income v/s. all the statistically significant explanatory variables for Monthly Income.
+
+```{r RMSE}
+
+Income_predict = predict(Rreg)
+RMSE_Income = sqrt(mean((Fulldata$MonthlyIncome-Income_predict)^2))
+RMSE_Income
+
+```
+
+
+RMSE for income is < $3000; QOI#2 satisfied.
+
+CaseStudy - 02 YouTube Link: https://youtu.be/xjNT9R3IuH4
+
+
+
+
