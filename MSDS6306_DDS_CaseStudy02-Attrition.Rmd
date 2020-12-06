@@ -790,7 +790,7 @@ RMSE_Income
 
 RMSE for income is < $3000; QOI#2 satisfied.
 
-CaseStudy - 02 YouTube Link: https://youtu.be/xjNT9R3IuH4
+CaseStudy - 02 YouTube Link: https://youtu.be/oSLj7K4_F7g
 
 
 
